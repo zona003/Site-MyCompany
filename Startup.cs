@@ -20,7 +20,7 @@ namespace MyCompany
 {
     public class Startup
     {
-        public IConfiguration Configuration { get;}
+        public IConfiguration Configuration { get; }
         public Startup(IConfiguration configuration) => Configuration = configuration;
 
 
@@ -33,7 +33,7 @@ namespace MyCompany
             services.AddTransient<ITextFieldsRepository, EFTextFieldsRepository>();
             services.AddTransient<IServiceItemsRepository, EFServiceItemsRepository>();
             services.AddTransient<DataManager>();
-            
+
             //подключаем контекст БД
             services.AddDbContext<AppDbContext>(x => x.UseSqlServer(Config.ConnectionString));
 
@@ -58,8 +58,17 @@ namespace MyCompany
                 options.SlidingExpiration = true;
             });
 
+            //настраиваем политику авторизации для Admin area
+            services.AddAuthorization(x =>
+            {
+                x.AddPolicy("AdminArea", policy => { policy.RequireRole("admin"); });
+            });
+
             //добавляем поддержку контролеров и предсталений (MVC)
-            services.AddControllersWithViews()
+            services.AddControllersWithViews(x =>
+            {
+                x.Conventions.Add(new AdminAreaAuthorization("Admin", "AdminArea"));
+            })
                 //выставаляем совместимость с asp.net core 3
                 .SetCompatibilityVersion(CompatibilityVersion.Version_3_0).AddSessionStateTempDataProvider();
         }
@@ -68,8 +77,8 @@ namespace MyCompany
         {
             //Порядок регистрации middleware
 
-            
-            if (env.IsDevelopment()) 
+
+            if (env.IsDevelopment())
                 app.UseDeveloperExceptionPage();
 
             //подключаем использование статичных файлов
@@ -87,6 +96,7 @@ namespace MyCompany
             //регистрируем маршруты(endpoints)
             app.UseEndpoints(endpoints =>
             {
+                endpoints.MapControllerRoute("admin", "{area:exists}/{controller=Home}/{action=Index}/{id?}");
                 endpoints.MapControllerRoute("default", "{controller=Home}/{action=Index}/{id?}");
             });
         }
